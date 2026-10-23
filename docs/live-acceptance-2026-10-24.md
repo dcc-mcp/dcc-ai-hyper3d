@@ -78,7 +78,7 @@ These measurements describe the downloaded containers. Native material appearanc
 
 ## Encoding and recovery
 
-The original nonempty `addons` JSON-array form part received a definitive HTTP 400. The corrected R1 submission encoded the public array as literal comma-separated form text (`HighPack`), matching the [official SDK implementation](https://github.com/DeemosTech/rodin3d-skills/blob/46f311c768c0d12c6b63078e562110f958d3bf66/skills/rodin3d-skill/scripts/api_client.py#L100-L101), and completed. It was an explicit corrected submission, with no automatic paid retry. The field-specific fix preserves the public array schema, JSON encoding for `image_label` / `bbox_condition`, lowercase boolean encoding and omission of empty arrays.
+The original nonempty `addons` JSON-array form part received a definitive HTTP 400. The corrected R1 submission encoded the public array as literal comma-separated form text (`HighPack`), matching the [official SDK implementation](https://github.com/DeemosTech/rodin3d-skills/blob/46f311c768c0d12c6b63078e562110f958d3bf66/skills/rodin3d-skill/scripts/api_client.py#L97-L98), and completed. It was an explicit corrected submission, with no automatic paid retry. The field-specific fix preserves the public array schema, JSON encoding for `image_label` / `bbox_condition`, lowercase boolean encoding and omission of empty arrays.
 
 R7's initial download failed on the network; resuming the same completed task succeeded without another paid submission. A selected-filename download also passed. Live status receipts observed Waiting, Generating and Done; usage pagination page 2 returned nine entries. An initial unsupported links harness operation made no provider call; the corrected explicit MCP HTTP links probe passed.
 
