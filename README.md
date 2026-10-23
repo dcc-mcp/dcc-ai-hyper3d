@@ -17,11 +17,13 @@ texture generation, task queries and local asset delivery to any adapter.
 | `get_balance` | Read account balance and paginated usage history |
 | `download_assets` | Check completion, save selected/all outputs, return hashes and asset descriptors |
 
-This covers the seven documented API endpoints. Files upload inline with the
-submission. The public API has no separate cancellation, task-list, delete,
-rigging or standalone remesh endpoint. See the full
+This implements the seven documented public API endpoints and exposes their
+documented request options. Files upload inline with the submission. The public
+reference documents no separate cancellation, task-list, delete, rigging,
+animation or standalone remesh endpoint; website and native-plugin feature
+parity is outside this scope. See the full
 [API reference and constraints](skill/hyper3d/references/API.md), verified
-against [Hyper3D documentation](https://docs.hyper3d.ai/en) on 2026-10-23.
+against [Hyper3D documentation](https://docs.hyper3d.ai/en) on 2026-10-24.
 
 ## Install
 
@@ -108,11 +110,20 @@ See that report for per-format material and unit limits. Agentic remains a
 provider beta.
 
 The [2026-10-24 expanded acceptance](docs/live-acceptance-2026-10-24.md)
-adds 21 completed paid cases for 14.5 credits: every documented Rodin and
-Agentic tier, Bang upload/instruction modes, all six texture modes and all five
-output formats across the sampled workflows. It records actual output hashes
-and measured limits; this is representative coverage, not every option
-combination. The resulting assets also feed a native Godot showcase.
+records 21 completed paid cases for 14.5 credits: nine Rodin tiers, all Agentic
+tiers, Bang upload/instruction modes, all six texture modes and all five output
+formats across sampled workflows. Together with the earlier Gen-2.5-Low cases,
+every documented Rodin tier has a completed example. These 21 paid submissions
+used the direct Python runtime harness.
+
+The [character acceptance addendum](docs/live-acceptance-2026-10-24-heroes.md)
+adds two completed paid generations through actual MCP HTTP calls, bringing
+the expanded round to **23 cases and 15.5 credits**. It separates generated
+mesh/UV/PBR, Blender-authored rigs and clips, and Godot runtime checks. Native
+near-view and scripted motion samples were approved; controlled OS-input and
+Web acceptance remain pending. This is representative
+coverage; parameter effects, option combinations, error cases and cross-DCC
+imports are not exhaustively validated.
 
 From a source checkout, [the acceptance harness](skill/hyper3d/references/WORKFLOWS.md#local-acceptance-harness)
 reads one explicit action from JSON stdin and records private state separately

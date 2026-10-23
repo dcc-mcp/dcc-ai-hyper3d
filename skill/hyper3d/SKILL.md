@@ -59,15 +59,20 @@ Generation/processing consumes account credits. A submission timeout can mean
 the provider accepted the request: do not automatically submit it again. The
 API exposes no documented cancel, task-list, deletion, account-key creation,
 standalone upload or separate remesh endpoint. Topology options belong to Rodin
-and Bang. `get_download_links` returns temporary signed URLs; keep them private.
+and Bang. `TAPose` requests rest-pose conditioning; the public reference
+documents no skeleton, automatic-rigging or animation endpoint. Use native
+host tools for rigging and clips. `get_download_links` returns temporary signed
+URLs; keep them private.
 
 Errors retain recovery context. If a multi-file download partially succeeds,
 keep its verified files and retry only missing names with `filenames`, or use a
 new output directory. There is no archive extraction or scene import side effect.
 
-Multipart fields use lowercase booleans and JSON text for nonempty arrays.
-Empty lists are omitted so optional fields use provider defaults; explicitly
-sending `addons: []` as a form part was rejected in live testing. HTTP errors
-retain bounded, sanitized validation details without credentials or remote URLs.
+Multipart fields use lowercase booleans. Nonempty `addons` arrays encode as
+comma-separated literal text (`HighPack`); `image_label` and `bbox_condition`
+arrays encode as JSON text. The public tool parameters remain arrays. Empty
+lists are omitted so optional fields use provider defaults; explicitly sending
+`addons: []` as a form part was rejected in live testing. HTTP errors retain
+bounded, sanitized validation details without credentials or remote URLs.
 
 For cross-DCC examples see [workflows](references/WORKFLOWS.md).
