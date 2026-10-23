@@ -74,7 +74,8 @@ before production use.
 
 ## Source checks and remaining coverage
 
-`python -m unittest discover -s tests -v`: **45 passed**.
+`python -m unittest discover -s tests -v`: **47 tests**; the Windows run passed
+45 and skipped two POSIX-only permission checks, which run in Linux CI.
 `dcc-mcp-cli lint skill/hyper3d --warnings-as-errors --no-update-maintenance`:
 **8 execution contracts checked, 0 errors, 0 warnings**. The acceptance harness
 also passed a Python 3.7 syntax check.

@@ -90,6 +90,8 @@ def run(payload, runtime=None):
     method = getattr(runtime, submissions[kind] if operation == "submit" else methods[operation])
     directory = Path(payload["evidence_dir"]).expanduser().resolve()
     directory.mkdir(parents=True, exist_ok=True, mode=0o700)
+    if os.name == "posix" and directory.stat().st_mode & 0o077:
+        raise PermissionError("evidence_dir must deny group and other access")
     identifier = uuid.uuid4().hex
     private_path = directory / (identifier + ".private.json")
     report_path = directory / (identifier + ".json")
@@ -98,7 +100,8 @@ def run(payload, runtime=None):
     if operation == "submit":
         record["kind"] = kind
     # Reserve both evidence files before a possibly billed call, and never overwrite.
-    with private_path.open("x", encoding="utf-8") as private, report_path.open("x", encoding="utf-8") as report:
+    private_handle = os.open(str(private_path), os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+    with os.fdopen(private_handle, "w", encoding="utf-8") as private, report_path.open("x", encoding="utf-8") as report:
         try:
             result = method(**arguments)
             record.update(success=True, api_success=True, result=result)
