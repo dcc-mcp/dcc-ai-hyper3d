@@ -8,6 +8,7 @@ from pathlib import Path
 import socket
 import sys
 import tempfile
+from types import SimpleNamespace
 import unittest
 from unittest.mock import Mock, patch
 from urllib import error
@@ -144,6 +145,26 @@ class RuntimeTests(unittest.TestCase):
         with patch.object(runtime, "MAX_UPLOAD", 1):
             with self.assertRaises(runtime.Hyper3DError):
                 runtime._multipart({}, [("images", self.model)])
+
+    def test_growing_upload_is_bounded_and_rejected(self):
+        class GrowingStream(io.BytesIO):
+            def read(self, size=-1):
+                if size < 0:
+                    raise AssertionError("Upload read must stay bounded")
+                return super().read(size)
+        upload = SimpleNamespace(
+            suffix=".png", stat=lambda: SimpleNamespace(st_size=4),
+            open=lambda mode: GrowingStream(b"12345"),
+        )
+        with self.assertRaisesRegex(runtime.Hyper3DError, "Upload changed"):
+            runtime._multipart({}, [("images", upload)])
+
+    def test_cancellation_during_upload_prevents_paid_request(self):
+        with patch.object(runtime, "check_cancelled", side_effect=[None, runtime.CancelledError("cancelled")]), patch.object(runtime.request, "build_opener") as opener:
+            result = runtime.tool_call(runtime.create_rodin_task, parameters={}, image_paths=[str(self.image)])
+        self.assertFalse(result["success"])
+        self.assertEqual(result["error"], "cancelled")
+        opener.assert_not_called()
 
     def test_rodin_generation_specific_fields(self):
         cases = [

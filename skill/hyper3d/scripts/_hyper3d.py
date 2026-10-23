@@ -16,7 +16,7 @@ import uuid
 from urllib import error, parse, request
 
 from dcc_mcp_core.skills_helper import (
-    check_cancelled, json_dumps, json_loads, skill_error, skill_success,
+    CancelledError, check_cancelled, json_dumps, json_loads, skill_error, skill_success,
 )
 
 
@@ -50,6 +50,8 @@ def tool_call(operation, **arguments):
         return skill_success("Hyper3D operation completed", **operation(**arguments))
     except Hyper3DError as exc:
         return skill_error(str(exc), exc.code, **exc.details)
+    except CancelledError:
+        return skill_error("Hyper3D operation cancelled", "cancelled")
     except Exception:
         return skill_error("Hyper3D operation failed; credentials and remote URLs are hidden", "operation_failed")
 
@@ -99,6 +101,7 @@ def _api(endpoint, payload=None, multipart=None, usage_page=None):
     else:
         body = None
     req = request.Request(url, data=body, headers=headers, method="GET" if body is None else "POST")
+    check_cancelled()
     try:
         # urllib is needed for multipart/streaming; disable redirects to keep API credentials on the fixed origin.
         with request.build_opener(request.ProxyHandler({}), _NoRedirect()).open(req, timeout=API_TIMEOUT) as response:
@@ -218,7 +221,8 @@ def _multipart(parameters, uploads):
         # Never copy user-controlled filenames into multipart headers.
         name = "upload" + path.suffix.lower()
         header = '--' + boundary + '\r\nContent-Disposition: form-data; name="' + field + '"; filename="' + name + '"\r\nContent-Type: ' + (mimetypes.guess_type(name)[0] or "application/octet-stream") + '\r\n\r\n'
-        content = path.read_bytes()
+        with path.open("rb") as stream:
+            content = stream.read(size + 1)
         if len(content) != size:
             raise Hyper3DError("Upload changed while being read")
         parts.extend([header.encode("utf-8"), content, b"\r\n"])
