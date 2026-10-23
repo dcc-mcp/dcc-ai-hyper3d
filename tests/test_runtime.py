@@ -51,7 +51,7 @@ class RuntimeTests(unittest.TestCase):
 
     def test_generation_endpoints_and_multipart_forwarding(self):
         cases = [
-            (runtime.create_rodin_task, {"parameters": {"prompt": "a chair", "bbox_condition": [1, 2, 3], "addons": ["HighPack"], "soft": True, "future_provider_option": {"enabled": True}}, "image_paths": [str(self.image)]}, "rodin", b'name="images"', False),
+            (runtime.create_rodin_task, {"parameters": {"prompt": "a chair", "bbox_condition": [1, 2, 3], "addons": ["HighPack"], "image_label": ["F"], "soft": True, "future_provider_option": {"enabled": True}}, "image_paths": [str(self.image)]}, "rodin", b'name="images"', False),
             (runtime.create_agentic_task, {"parameters": {"tier": "basic", "export_type": "glb"}, "image_paths": [str(self.image)]}, "rodin_agentic", b'name="images"', True),
             (runtime.create_bang_task, {"parameters": {"material": "None"}, "model_path": str(self.model)}, "bang", b'name="model"', False),
             (runtime.create_texture_task, {"parameters": {"reference_scale": 0.5}, "model_path": str(self.model), "image_paths": [str(self.image)]}, "rodin_texture_only", b'name="image"', False),
@@ -71,10 +71,25 @@ class RuntimeTests(unittest.TestCase):
                 self.assertEqual(opener.open.call_count, 1)
                 if endpoint == "rodin":
                     self.assertIn(b"Gen-2.5-Medium", req.data)
-                    self.assertIn(b"[1,2,3]", req.data)
-                    self.assertIn(b"[\"HighPack\"]", req.data)
-                    self.assertIn(b"\r\ntrue\r\n", req.data)
-                    self.assertIn(b'name="future_provider_option"', req.data)
+                    self.assertIn(b'name="bbox_condition"\r\n\r\n[1,2,3]\r\n', req.data)
+                    self.assertIn(b'name="addons"\r\n\r\nHighPack\r\n', req.data)
+                    self.assertNotIn(b'["HighPack"]', req.data)
+                    self.assertIn(b'name="image_label"\r\n\r\n["F"]\r\n', req.data)
+                    self.assertIn(b'name="soft"\r\n\r\ntrue\r\n', req.data)
+                    self.assertIn(b'name="future_provider_option"\r\n\r\n{"enabled":true}\r\n', req.data)
+
+    def test_addons_use_literal_form_text_for_all_rodin_generations(self):
+        for tier in ("Sketch", "Gen-2", "Gen-2.5-Medium"):
+            with self.subTest(tier=tier):
+                opener = self.api_fixture(self.submission())
+                with patch.object(runtime.request, "build_opener", return_value=opener):
+                    runtime.create_rodin_task({"prompt": "a chair", "tier": tier,
+                                               "addons": ["HighPack"]})
+                body = opener.open.call_args[0][0].data
+                self.assertIn(b'name="addons"\r\n\r\nHighPack\r\n', body)
+                self.assertNotIn(b'["HighPack"]', body)
+                self.assertEqual(body.count(b'name="addons"'), 1)
+                self.assertEqual(opener.open.call_count, 1)
 
     def test_empty_optional_arrays_are_omitted_from_multipart(self):
         opener = self.api_fixture(self.submission())
