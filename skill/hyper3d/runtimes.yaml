@@ -1,0 +1,7 @@
+runtimes:
+  - name: hyper3d-api-key
+    type: env_var
+    env: HYPER3D_API_KEY
+    description: Hyper3D API bearer credential; RODIN_API_KEY is accepted as an alternative.
+    optional: true
+    guidance: Set HYPER3D_API_KEY or RODIN_API_KEY in the adapter environment before startup. Runtime rejects calls when neither is set.

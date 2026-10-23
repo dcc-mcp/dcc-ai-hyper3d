@@ -1,0 +1,636 @@
+tools:
+- name: create_rodin_task
+  description: Submit a paid text/image/multiview Rodin Gen 1/1.5, Gen 2 or Gen 2.5 job. Returns provider
+    task_uuid and subscription_key; never retries.
+  source_file: scripts/create_rodin_task.py
+  execution: sync
+  job_strategy: monolithic
+  affinity: any
+  enforce_thread_affinity: true
+  timeout_hint_secs: 130
+  annotations:
+    read_only_hint: false
+    destructive_hint: true
+    idempotent_hint: false
+    open_world_hint: true
+  group: hyper3d
+  input_schema:
+    type: object
+    additionalProperties: false
+    properties:
+      parameters:
+        type: object
+        additionalProperties: false
+        properties:
+          tier:
+            type: string
+            enum:
+            - Sketch
+            - Regular
+            - Detail
+            - Smooth
+            - Gen-2
+            - Gen-2.5-Extreme-Low
+            - Gen-2.5-Low
+            - Gen-2.5-Medium
+            - Gen-2.5-High
+            - Gen-2.5-Extreme-High
+            description: Defaults to Gen-2.5-Medium. Version-specific options and face limits are checked
+              before submission.
+          prompt:
+            type: string
+            maxLength: 1024
+          mesh_mode:
+            type: string
+            enum:
+            - Raw
+            - Quad
+          geometry_file_format: &id002
+            type: string
+            enum:
+            - glb
+            - usdz
+            - fbx
+            - obj
+            - stl
+          material: &id003
+            type: string
+            enum:
+            - PBR
+            - Shaded
+            - All
+            - Hybrid
+            - None
+          quality:
+            type: string
+            enum:
+            - high
+            - medium
+            - low
+            - extra-low
+          quality_override:
+            type: integer
+            minimum: 500
+            maximum: 2000000
+          seed:
+            type: integer
+            minimum: 0
+            maximum: 65535
+          bbox_condition:
+            type: array
+            minItems: 3
+            maxItems: 3
+            items:
+              type: integer
+              minimum: 1
+              maximum: 2048
+          addons:
+            type: array
+            uniqueItems: true
+            items:
+              type: string
+              enum:
+              - HighPack
+          TAPose: &id001
+            type: boolean
+          use_original_alpha: *id001
+          preview_render: *id001
+          condition_mode:
+            type: string
+            enum:
+            - concat
+            - fuse
+          mesh_simplify: *id001
+          mesh_smooth: *id001
+          soft: *id001
+          quad_normal: *id001
+          hd_texture: *id001
+          detail_level:
+            type: integer
+            minimum: 1
+            maximum: 3
+          is_symmetric:
+            type: string
+            enum:
+            - symmetric
+            - balanced
+            - asymmetric
+            - unknown
+          texture_mode: &id004
+            type: string
+            enum:
+            - legacy
+            - extreme-low
+            - low
+            - medium
+            - high
+            - extreme-high
+          image_label:
+            type: array
+            maxItems: 5
+            items:
+              type: string
+              enum:
+              - F
+              - FL
+              - FR
+              - L
+              - R
+              - B
+              - BL
+              - BR
+              - U
+              - D
+              - '?'
+          uhd_texture: *id001
+          is_micro: *id001
+          texture_delight: *id001
+          geometry_instruct_mode:
+            type: string
+            enum:
+            - faithful
+            - creative
+        description: Exact provider field names. Cross-field and model-family rules are validated at runtime;
+          see references/API.md.
+      image_paths:
+        type: array
+        minItems: 0
+        maxItems: 5
+        items:
+          type: string
+          minLength: 1
+        description: Absolute image paths on the adapter machine; uploaded inline in order.
+  output_schema:
+    type: object
+    required:
+    - success
+    - message
+    properties:
+      success:
+        type: boolean
+      message:
+        type: string
+      error:
+        type: string
+      context:
+        type: object
+        description: Provider payload, durable task identity, recovery context, or local file descriptors.
+  call_examples:
+  - arguments:
+      parameters:
+        tier: Gen-2.5-Medium
+        prompt: A wooden treasure chest
+        geometry_file_format: glb
+  next-tools:
+    on-success:
+    - get_task_status
+    on-failure:
+    - get_balance
+- name: create_agentic_task
+  description: Submit a paid Agentic Beta job from 1-5 images; normalizes the singular job subscription
+    key.
+  source_file: scripts/create_agentic_task.py
+  execution: sync
+  job_strategy: monolithic
+  affinity: any
+  enforce_thread_affinity: true
+  timeout_hint_secs: 130
+  annotations:
+    read_only_hint: false
+    destructive_hint: true
+    idempotent_hint: false
+    open_world_hint: true
+  group: hyper3d
+  input_schema:
+    type: object
+    additionalProperties: false
+    properties:
+      parameters:
+        type: object
+        additionalProperties: false
+        properties:
+          tier:
+            type: string
+            enum:
+            - basic
+            - standard
+            - pro
+          prompt:
+            type: string
+            maxLength: 1024
+          export_type:
+            type: string
+            enum:
+            - glb
+            - usdz
+            - fbx
+            - stl
+        description: Exact provider field names. Cross-field and model-family rules are validated at runtime;
+          see references/API.md.
+      image_paths:
+        type: array
+        minItems: 1
+        maxItems: 5
+        items:
+          type: string
+          minLength: 1
+        description: Absolute image paths on the adapter machine; uploaded inline in order.
+    required:
+    - image_paths
+  output_schema:
+    type: object
+    required:
+    - success
+    - message
+    properties:
+      success:
+        type: boolean
+      message:
+        type: string
+      error:
+        type: string
+      context:
+        type: object
+        description: Provider payload, durable task identity, recovery context, or local file descriptors.
+  call_examples:
+  - arguments:
+      parameters:
+        tier: standard
+        export_type: glb
+      image_paths:
+      - C:/references/front.png
+  next-tools:
+    on-success:
+    - get_task_status
+    on-failure:
+    - get_balance
+- name: create_bang_task
+  description: Submit paid Bang splitting/topology processing from asset_id or an uploaded model. Custom
+    model image requirements depend on material and instruction.
+  source_file: scripts/create_bang_task.py
+  execution: sync
+  job_strategy: monolithic
+  affinity: any
+  enforce_thread_affinity: true
+  timeout_hint_secs: 130
+  annotations:
+    read_only_hint: false
+    destructive_hint: true
+    idempotent_hint: false
+    open_world_hint: true
+  group: hyper3d
+  input_schema:
+    type: object
+    additionalProperties: false
+    properties:
+      parameters:
+        type: object
+        additionalProperties: false
+        properties:
+          asset_id:
+            type: string
+            description: Completed Rodin task UUID; mutually exclusive with model_path.
+          prompt:
+            type: string
+          instruction:
+            type: string
+          strength:
+            type: integer
+            minimum: 1
+            maximum: 12
+          mesh_mode:
+            type: string
+            enum:
+            - Raw
+            - Quad
+          quality_override:
+            type: integer
+            minimum: 500
+            maximum: 2000000
+          escore:
+            type: number
+            minimum: 0
+            maximum: 10
+          reference_scale:
+            type: number
+            minimum: 0
+            maximum: 1
+          seed:
+            type: integer
+            minimum: 0
+            maximum: 65535
+          geometry_file_format: *id002
+          material: *id003
+          resolution:
+            type: string
+            enum:
+            - Basic
+            - High
+        description: Exact provider field names. Cross-field and model-family rules are validated at runtime;
+          see references/API.md.
+      model_path:
+        type: string
+        description: Absolute mesh path. Cannot be used with parameters.asset_id.
+      image_paths:
+        type: array
+        minItems: 0
+        maxItems: 1
+        items:
+          type: string
+          minLength: 1
+        description: Absolute image paths on the adapter machine; uploaded inline in order.
+  output_schema:
+    type: object
+    required:
+    - success
+    - message
+    properties:
+      success:
+        type: boolean
+      message:
+        type: string
+      error:
+        type: string
+      context:
+        type: object
+        description: Provider payload, durable task identity, recovery context, or local file descriptors.
+  call_examples:
+  - arguments:
+      parameters:
+        asset_id: completed-rodin-task-uuid
+        mesh_mode: Quad
+        quality_override: 18000
+  next-tools:
+    on-success:
+    - get_task_status
+    on-failure:
+    - get_balance
+- name: create_texture_task
+  description: Submit paid texture generation with one local mesh and exactly one reference image.
+  source_file: scripts/create_texture_task.py
+  execution: sync
+  job_strategy: monolithic
+  affinity: any
+  enforce_thread_affinity: true
+  timeout_hint_secs: 130
+  annotations:
+    read_only_hint: false
+    destructive_hint: true
+    idempotent_hint: false
+    open_world_hint: true
+  group: hyper3d
+  input_schema:
+    type: object
+    additionalProperties: false
+    properties:
+      parameters:
+        type: object
+        additionalProperties: false
+        properties:
+          prompt:
+            type: string
+          escore:
+            type: number
+            minimum: 0
+            maximum: 10
+          reference_scale:
+            type: number
+            minimum: 0.5
+            maximum: 1
+          hd_texture: *id001
+          texture_delight: *id001
+          texture_mode: *id004
+          seed:
+            type: integer
+            minimum: 0
+            maximum: 65535
+          geometry_file_format: *id002
+          material:
+            type: string
+            enum:
+            - PBR
+            - Shaded
+            - All
+            - Hybrid
+          resolution:
+            type: string
+            enum:
+            - Basic
+            - High
+        description: Exact provider field names. Cross-field and model-family rules are validated at runtime;
+          see references/API.md.
+      model_path:
+        type: string
+        description: Absolute OBJ/STL/GLTF/GLB/FBX/USDZ mesh path.
+      image_paths:
+        type: array
+        minItems: 1
+        maxItems: 1
+        items:
+          type: string
+          minLength: 1
+        description: Absolute image paths on the adapter machine; uploaded inline in order.
+    required:
+    - model_path
+    - image_paths
+  output_schema:
+    type: object
+    required:
+    - success
+    - message
+    properties:
+      success:
+        type: boolean
+      message:
+        type: string
+      error:
+        type: string
+      context:
+        type: object
+        description: Provider payload, durable task identity, recovery context, or local file descriptors.
+  call_examples:
+  - arguments:
+      parameters:
+        texture_mode: high
+        material: PBR
+      model_path: C:/assets/mesh.glb
+      image_paths:
+      - C:/references/material.png
+  next-tools:
+    on-success:
+    - get_task_status
+    on-failure:
+    - get_balance
+- name: get_task_status
+  description: Read all provider sub-job states. Only a nonempty collection entirely Done is complete.
+  source_file: scripts/get_task_status.py
+  execution: sync
+  job_strategy: monolithic
+  affinity: any
+  enforce_thread_affinity: true
+  timeout_hint_secs: 130
+  annotations:
+    read_only_hint: true
+    destructive_hint: false
+    idempotent_hint: true
+    open_world_hint: true
+  group: hyper3d
+  input_schema:
+    type: object
+    additionalProperties: false
+    properties:
+      subscription_key:
+        type: string
+        minLength: 1
+    required:
+    - subscription_key
+  output_schema:
+    type: object
+    required:
+    - success
+    - message
+    properties:
+      success:
+        type: boolean
+      message:
+        type: string
+      error:
+        type: string
+      context:
+        type: object
+        description: Provider payload, durable task identity, recovery context, or local file descriptors.
+- name: get_download_links
+  description: Read fresh signed result links by task_uuid after all sub-jobs complete. URLs expire; keep
+    them private.
+  source_file: scripts/get_download_links.py
+  execution: sync
+  job_strategy: monolithic
+  affinity: any
+  enforce_thread_affinity: true
+  timeout_hint_secs: 130
+  annotations:
+    read_only_hint: true
+    destructive_hint: false
+    idempotent_hint: true
+    open_world_hint: true
+  group: hyper3d
+  input_schema:
+    type: object
+    additionalProperties: false
+    properties:
+      task_uuid:
+        type: string
+        minLength: 1
+    required:
+    - task_uuid
+  output_schema:
+    type: object
+    required:
+    - success
+    - message
+    properties:
+      success:
+        type: boolean
+      message:
+        type: string
+      error:
+        type: string
+      context:
+        type: object
+        description: Provider payload, durable task identity, recovery context, or local file descriptors.
+- name: get_balance
+  description: Read account credits and optionally a 1-based page of up to 20 usage records.
+  source_file: scripts/get_balance.py
+  execution: sync
+  job_strategy: monolithic
+  affinity: any
+  enforce_thread_affinity: true
+  timeout_hint_secs: 130
+  annotations:
+    read_only_hint: true
+    destructive_hint: false
+    idempotent_hint: true
+    open_world_hint: true
+  group: hyper3d
+  input_schema:
+    type: object
+    additionalProperties: false
+    properties:
+      usage_page:
+        type: integer
+        minimum: 1
+  output_schema:
+    type: object
+    required:
+    - success
+    - message
+    properties:
+      success:
+        type: boolean
+      message:
+        type: string
+      error:
+        type: string
+      context:
+        type: object
+        description: Provider payload, durable task identity, recovery context, or local file descriptors.
+- name: download_assets
+  description: Recheck job completion, download selected/all outputs without overwrite, and return file
+    hashes and validated cross-DCC asset descriptors.
+  source_file: scripts/download_assets.py
+  execution: sync
+  job_strategy: monolithic
+  affinity: any
+  enforce_thread_affinity: true
+  timeout_hint_secs: 600
+  annotations:
+    read_only_hint: false
+    destructive_hint: false
+    idempotent_hint: false
+    open_world_hint: true
+  group: hyper3d
+  input_schema:
+    type: object
+    additionalProperties: false
+    properties:
+      task_uuid:
+        type: string
+        minLength: 1
+      subscription_key:
+        type: string
+        minLength: 1
+      output_dir:
+        type: string
+        description: Absolute local output directory; existing file names are rejected.
+      filenames:
+        type: array
+        minItems: 1
+        uniqueItems: true
+        items:
+          type: string
+          minLength: 1
+        description: Optional exact names from get_download_links, for selecting outputs or recovering
+          missing files.
+    required:
+    - task_uuid
+    - subscription_key
+    - output_dir
+  output_schema:
+    type: object
+    required:
+    - success
+    - message
+    properties:
+      success:
+        type: boolean
+      message:
+        type: string
+      error:
+        type: string
+      context:
+        type: object
+        description: Provider payload, durable task identity, recovery context, or local file descriptors.
+  next-tools:
+    on-failure:
+    - get_task_status
+    - get_download_links
