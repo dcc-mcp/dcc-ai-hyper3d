@@ -8,7 +8,7 @@ license: MIT
 compatibility: "Python 3.7+, dcc-mcp-core 0.20.44+; Hyper3D API credential and network access"
 metadata:
   dcc-mcp:
-    version: "0.1.1"
+    version: "0.1.2"
     dcc: python
     layer: domain
     tags: [pipeline, ai, hyper3d, rodin, 3d-generation, text-to-3d, image-to-3d, cross-dcc]

@@ -107,6 +107,13 @@ Maya 2027.2 and Blender 5.2.0, at a total experiment cost of 2.5 credits.
 See that report for per-format material and unit limits. Agentic remains a
 provider beta.
 
+The [2026-10-24 expanded acceptance](docs/live-acceptance-2026-10-24.md)
+adds 21 completed paid cases for 14.5 credits: every documented Rodin and
+Agentic tier, Bang upload/instruction modes, all six texture modes and all five
+output formats across the sampled workflows. It records actual output hashes
+and measured limits; this is representative coverage, not every option
+combination. The resulting assets also feed a native Godot showcase.
+
 From a source checkout, [the acceptance harness](skill/hyper3d/references/WORKFLOWS.md#local-acceptance-harness)
 reads one explicit action from JSON stdin and records private state separately
 from a sanitized report. It never retries a paid submission automatically.

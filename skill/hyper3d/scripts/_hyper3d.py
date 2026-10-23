@@ -246,6 +246,9 @@ def _multipart(parameters, uploads):
     for field, value in parameters.items():
         if isinstance(value, list) and not value:
             continue
+        if field == "addons" and isinstance(value, list):
+            # Match the provider SDK's comma-separated addon form field.
+            value = ",".join(value)
         encoded = value if isinstance(value, str) else json_dumps(value)
         parts.append(("--" + boundary + '\r\nContent-Disposition: form-data; name="' + field + '"\r\n\r\n' + encoded + "\r\n").encode("utf-8"))
     for field, path in uploads:
