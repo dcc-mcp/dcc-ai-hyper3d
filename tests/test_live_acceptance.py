@@ -122,3 +122,33 @@ class AcceptanceTests(unittest.TestCase):
                 self.assertIn("field addons invalid", result["message"])
                 for secret in ("multiline-secret", "token-secret", "fixture-api-secret"):
                     self.assertNotIn(secret, repr(result))
+
+    @unittest.skipUnless(os.name == "posix", "POSIX permission bits required")
+    def test_posix_shared_directory_refuses_before_paid_call(self):
+        directory = Path(self.directory.name)
+        directory.chmod(0o777)
+        self.addCleanup(directory.chmod, 0o700)
+        self.runtime.create_rodin_task = Mock()
+        with self.assertRaises(PermissionError):
+            self.run_operation("submit", kind="rodin", arguments={"parameters": {"prompt": "a chair"}})
+        self.runtime.create_rodin_task.assert_not_called()
+        self.assertEqual(directory.stat().st_mode & 0o777, 0o777)
+        self.assertEqual(list(directory.iterdir()), [])
+
+    @unittest.skipUnless(os.name == "posix", "POSIX permission bits required")
+    def test_posix_private_file_is_restricted_before_paid_call_under_open_umask(self):
+        def submission(**arguments):
+            paths = list(Path(self.directory.name).glob("*.private.json"))
+            self.assertEqual(len(paths), 1)
+            self.assertEqual(paths[0].stat().st_mode & 0o777, 0o600)
+            return {"task_uuid": "task-fixture", "subscription_key": "subscription-secret"}
+
+        self.runtime.create_rodin_task = Mock(side_effect=submission)
+        previous = os.umask(0)
+        try:
+            result = self.run_operation("submit", kind="rodin", arguments={"parameters": {"prompt": "a chair"}})
+        finally:
+            os.umask(previous)
+        self.assertTrue(result["success"])
+        self.runtime.create_rodin_task.assert_called_once()
+        self.assertEqual(Path(result["state_file"]).stat().st_mode & 0o777, 0o600)

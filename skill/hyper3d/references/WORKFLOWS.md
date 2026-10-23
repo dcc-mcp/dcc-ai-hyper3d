@@ -100,8 +100,11 @@ For `download`, pass that state file and `arguments.output_dir`, with optional
 `arguments.filenames`. The state carries identities through status calls;
 download results preserve the runtime's hashes and asset descriptors.
 
-The evidence directory must be writable before an API call starts. Private
-state retains job credentials and full results with the API key removed;
+The evidence directory must be writable before an API call starts. On POSIX,
+it must deny group and other access; existing permissions are never changed,
+and private files are created with mode `0600`. Windows uses inherited
+filesystem ACLs, so choose an evidence directory with appropriate access.
+Private state retains job credentials and full results with the API key removed;
 stdout and the separate report redact credentials, provider identities and
 remote URLs. Keep private state local. `local-evidence/` is ignored by Git.
 Do not publish its files, generated assets, or reference images inadvertently.
