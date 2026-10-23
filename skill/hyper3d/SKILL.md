@@ -8,7 +8,7 @@ license: MIT
 compatibility: "Python 3.7+, dcc-mcp-core 0.20.44+; Hyper3D API credential and network access"
 metadata:
   dcc-mcp:
-    version: "0.1.0"
+    version: "0.1.1"
     dcc: python
     layer: domain
     tags: [pipeline, ai, hyper3d, rodin, 3d-generation, text-to-3d, image-to-3d, cross-dcc]
@@ -48,6 +48,13 @@ commit them. Calls use the fixed `https://api.hyper3d.com/api/v2` endpoint.
    license and importer format support before scene mutation; the API does not
    provide verified coordinate or licensing metadata.
 
+Inspect the destination import schema. Blender adapter 0.2.4 accepted the shared
+descriptor unchanged; Maya adapter 0.9.42 required a legacy `asset` containing
+the selected variant's `path` and `format`. Keep this mapping at the host import
+boundary. In the tested OBJ output, no MTL or `usemtl` bindings were supplied;
+downloaded texture images therefore require material assignment. See
+[host import checks](references/WORKFLOWS.md#host-import-checks).
+
 Generation/processing consumes account credits. A submission timeout can mean
 the provider accepted the request: do not automatically submit it again. The
 API exposes no documented cancel, task-list, deletion, account-key creation,
@@ -57,5 +64,10 @@ and Bang. `get_download_links` returns temporary signed URLs; keep them private.
 Errors retain recovery context. If a multi-file download partially succeeds,
 keep its verified files and retry only missing names with `filenames`, or use a
 new output directory. There is no archive extraction or scene import side effect.
+
+Multipart fields use lowercase booleans and JSON text for nonempty arrays.
+Empty lists are omitted so optional fields use provider defaults; explicitly
+sending `addons: []` as a form part was rejected in live testing. HTTP errors
+retain bounded, sanitized validation details without credentials or remote URLs.
 
 For cross-DCC examples see [workflows](references/WORKFLOWS.md).
