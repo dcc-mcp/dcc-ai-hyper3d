@@ -36,7 +36,7 @@ tool argument.
 The source repository can be installed at an explicitly reviewed commit:
 
 ```text
-dcc-mcp-cli marketplace add-repo dcc-mcp/dcc-ai-hyper3d --commit <FULL_40_CHARACTER_COMMIT_SHA> --dcc all
+dcc-mcp-cli marketplace add-repo dcc-mcp/dcc-ai-hyper3d --commit <FULL_40_CHARACTER_COMMIT_SHA> --dcc any
 ```
 
 After the official catalog entry is merged, install through the shared catalog:

@@ -329,7 +329,7 @@ class RuntimeTests(unittest.TestCase):
 
     def test_redirect_validation_and_no_asset_authorization(self):
         first = Mock()
-        first.open.side_effect = error.HTTPError("https://assets.example/file", 302, "redirect", {"Location": "https://127.0.0.1/private?sig=private"}, None)
+        first.open.side_effect = error.HTTPError("https://assets.example/file", 302, "redirect", {"Location": "https://127.0.0.1/private?sig=private"}, io.BytesIO())
         with patch.object(runtime, "_public_url", side_effect=["1.1.1.1", runtime.Hyper3DError("unsafe", "unsafe_download_url")]) as validate, patch.object(runtime.request, "build_opener", return_value=first):
             result = runtime.tool_call(runtime._open_asset, url="https://assets.example/file")
         self.assertFalse(result["success"])
