@@ -1,6 +1,6 @@
 # Hyper3D public API contract
 
-Verified against the current English official documentation on 2026-10-23. This is a compact integration reference; the linked upstream schemas remain authoritative. Public API coverage means the seven endpoints below, including all Rodin model families. The public reference does not document separate upload, cancel, task-list, delete, remesh, mesh-edit, rigging, model-search, or asset-library endpoints. Uploads accompany multipart submissions; topology and target-face controls belong to generation or Bang.
+Verified against the current English official documentation on 2026-10-24. This is a compact integration reference; the linked upstream schemas remain authoritative. Public API coverage means implementation of the seven endpoints below and exposure of their documented request fields, including all Rodin model families. It does not establish website or native-plugin feature parity. The public reference does not document separate upload, cancel, task-list, delete, remesh, mesh-edit, rigging, animation, model-search, or asset-library endpoints. Uploads accompany multipart submissions; topology and target-face controls belong to generation or Bang. `TAPose` requests rest-pose conditioning, not a skeleton or animation.
 
 ## Transport and lifecycle
 
@@ -139,13 +139,31 @@ acceptance on 2026-10-23 confirmed JSON text for nonempty `image_label` and
 `bbox_condition` arrays and lowercase boolean text. An explicit empty `addons`
 array form part caused HTTP 400 without a charge; omitting that part allowed
 the otherwise identical request. The integration therefore omits empty list
-fields. Nonempty `addons` encoding remains covered by offline fixtures only.
+fields. For nonempty `addons`, JSON array text was also rejected; the runtime
+uses comma-separated literal text, matching the
+[provider SDK](https://github.com/DeemosTech/rodin3d-skills/blob/46f311c768c0d12c6b63078e562110f958d3bf66/skills/rodin3d-skill/scripts/api_client.py#L97-L98).
+The 2026-10-24 Sketch request with `addons=["HighPack"]` encoded as `HighPack`
+was accepted, completed and downloaded. Other supported nonempty arrays retain
+JSON encoding; public tool parameters remain arrays.
 
-Five paid tasks exercised Gen-2.5 Low text and image generation, Agentic basic,
+On 2026-10-23, five paid tasks exercised Gen-2.5 Low text and image generation, Agentic basic,
 Bang asset mode, and texture generation, with completed downloads at a total
-cost of 2.5 credits. This does not establish live coverage of every generation
-tier, option, format, or Bang model-upload mode. See the
+cost of 2.5 credits. See the
 [dated acceptance report](https://github.com/dcc-mcp/dcc-ai-hyper3d/blob/main/docs/live-acceptance-2026-10-23.md).
+The [2026-10-24 expanded report](https://github.com/dcc-mcp/dcc-ai-hyper3d/blob/main/docs/live-acceptance-2026-10-24.md)
+records 21 further paid cases through the direct runtime harness for 14.5
+credits. Its nine Rodin tiers plus the earlier Gen-2.5-Low examples cover all
+ten documented tiers. The
+[character addendum](https://github.com/dcc-mcp/dcc-ai-hyper3d/blob/main/docs/live-acceptance-2026-10-24-heroes.md)
+adds two paid generations through actual MCP HTTP calls, making 23 cases and
+15.5 credits in the expanded round. The earlier five-case cost is separate.
+
+Accepted parameters do not establish every requested effect. Measured outputs
+include HighPack textures below the documented resolution and face counts that
+differ from requested targets; a triangulated export cannot prove quad topology.
+The dated reports separate acceptance, completion, downloads, artifact checks
+and native import. Combinations, reproducibility, rejection/error paths and
+cross-DCC material fidelity remain incompletely exercised.
 
 ## Integration limits
 
