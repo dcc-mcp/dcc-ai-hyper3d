@@ -121,13 +121,31 @@ Submission error codes: `INVALID_REQUEST`, `API_NO_ACTIVE_SUBSCRIPTION`, `API_SU
 
 HTTP 400: malformed input; 401: authentication; 429: throttling. Body errors must not trigger automatic resubmission. Upstream recommends backoff for 429/5xx; paid submissions need duplicate-charge caution when the outcome is ambiguous. Limits vary by endpoint/account, so do not hardcode a global rate. [Errors](https://docs.hyper3d.ai/en/api-specification/errors)
 
+The integration retains HTTP status, a safe provider code, and up to 512
+characters of sanitized JSON validation details. Credentials, Authorization
+text and HTTP URLs are redacted. Malformed or oversized error bodies are not
+returned. Read these details to correct a rejected request; a transport failure
+still has an unknown submission outcome and must not trigger an automatic retry.
+
 ## Billing, retention, and documentation gaps
 
 Endpoint documentation currently lists Gen-1/1.5 and Gen-2 at 0.5 credits; Gen-2.5 at 0.5 plus 0.5 for Extreme-High and 2 for extreme-high textures; Agentic basic/standard/pro at 0.5/1/2; Bang at 0.5; texture generation at 0.5, or 2 for extreme-high. Current marketing still mentions a HighPack surcharge while generation pages say unlisted options add no charge. Do not promise estimates as final cost; expose returned `consumed` and check [current API pricing](https://hyper3d.ai/features/api) and [pricing plans](https://hyper3d.ai/pricing) before paid work.
 
 API inputs/outputs remain in active systems for seven days. Download promptly. The API policy says they are not used for training or published to public assets, subject to the stated operational/legal exceptions. [Data Retention Policy](https://docs.hyper3d.ai/en/legal/data-retention-policy)
 
-Current docs demonstrate repeated binary `images` parts and a JSON bounding-box array. They do not specify a complete multipart encoding convention for non-file arrays. Lowercase boolean text and JSON array text are an integration choice that still needs authenticated service validation. This research did not submit paid tasks or verify live server behavior.
+The official docs demonstrate repeated binary `images` parts and a JSON
+bounding-box array without defining every multipart array convention. Live
+acceptance on 2026-10-23 confirmed JSON text for nonempty `image_label` and
+`bbox_condition` arrays and lowercase boolean text. An explicit empty `addons`
+array form part caused HTTP 400 without a charge; omitting that part allowed
+the otherwise identical request. The integration therefore omits empty list
+fields. Nonempty `addons` encoding remains covered by offline fixtures only.
+
+Five paid tasks exercised Gen-2.5 Low text and image generation, Agentic basic,
+Bang asset mode, and texture generation, with completed downloads at a total
+cost of 2.5 credits. This does not establish live coverage of every generation
+tier, option, format, or Bang model-upload mode. See the
+[dated acceptance report](https://github.com/dcc-mcp/dcc-ai-hyper3d/blob/main/docs/live-acceptance-2026-10-23.md).
 
 ## Integration limits
 

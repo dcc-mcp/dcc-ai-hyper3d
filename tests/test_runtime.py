@@ -76,6 +76,18 @@ class RuntimeTests(unittest.TestCase):
                     self.assertIn(b"\r\ntrue\r\n", req.data)
                     self.assertIn(b'name="future_provider_option"', req.data)
 
+    def test_empty_optional_arrays_are_omitted_from_multipart(self):
+        opener = self.api_fixture(self.submission())
+        with patch.object(runtime.request, "build_opener", return_value=opener):
+            runtime.create_rodin_task({"prompt": "a chair", "addons": [], "image_label": [],
+                                       "bbox_condition": [1, 1, 1], "soft": False})
+        body = opener.open.call_args[0][0].data
+        self.assertNotIn(b'name="addons"', body)
+        self.assertNotIn(b'name="image_label"', body)
+        self.assertIn(b'name="bbox_condition"\r\n\r\n[1,1,1]\r\n', body)
+        self.assertIn(b'name="soft"\r\n\r\nfalse\r\n', body)
+        self.assertEqual(opener.open.call_count, 1)
+
     def test_bang_asset_id_mode_needs_no_files(self):
         with patch.object(runtime, "_api", return_value=self.submission()) as api:
             runtime.create_bang_task({"asset_id": "source-task", "instruction": "wheels"})
@@ -226,6 +238,52 @@ class RuntimeTests(unittest.TestCase):
                 self.assertEqual(result["context"]["retry_after"], "30")
             else:
                 self.assertTrue(result["context"]["submission_may_have_succeeded"])
+
+    def test_http_validation_details_are_bounded_and_redacted(self):
+        data = {"error": "INVALID_REQUEST", "detail": [{"loc": ["body", "mesh_simplify"],
+                "msg": "Expected boolean; fixture-secret fallback-secret Authorization: Bearer other-secret https://asset.example/?sig=private"}],
+                "authorization": "another-secret"}
+        opener = Mock()
+        opener.open.side_effect = error.HTTPError("https://api.example", 400, "Bad Request", {}, io.BytesIO(json.dumps(data).encode("utf-8")))
+        with patch.object(runtime.request, "build_opener", return_value=opener):
+            result = runtime.tool_call(runtime.create_rodin_task, parameters={"prompt": "x"})
+        self.assertEqual(opener.open.call_count, 1)
+        self.assertEqual(result["context"]["provider_code"], "INVALID_REQUEST")
+        self.assertEqual(result["context"]["http_status"], 400)
+        message = result["context"]["provider_message"]
+        self.assertIn("mesh_simplify", message)
+        self.assertIn("Expected boolean", message)
+        self.assertLessEqual(len(message), 512)
+        for secret in ("fixture-secret", "fallback-secret", "other-secret", "another-secret", "sig=private", "https://"):
+            self.assertNotIn(secret, repr(result))
+
+    def test_http_malformed_or_large_body_is_hidden(self):
+        bodies = [b"fixture-secret <html>https://asset.example/?sig=private</html>",
+                  json.dumps({"message": "x" * 600}).encode("utf-8"), b"x" * (runtime.MAX_RESPONSE + 1)]
+        for body in bodies:
+            with self.subTest(size=len(body)):
+                stream = Mock(wraps=io.BytesIO(body))
+                opener = Mock()
+                opener.open.side_effect = error.HTTPError("https://api.example", 400, "Bad Request", {}, stream)
+                with patch.object(runtime.request, "build_opener", return_value=opener):
+                    result = runtime.tool_call(runtime.get_balance)
+                self.assertFalse(result["success"])
+                self.assertEqual(result["error"], "provider_http_error")
+                stream.read.assert_called_once_with(runtime.MAX_RESPONSE + 1)
+                self.assertLessEqual(len(result["context"].get("provider_message", "")), 512)
+                self.assertNotIn("fixture-secret", repr(result))
+                self.assertNotIn("sig=private", repr(result))
+
+    def test_http_diagnostics_redact_nested_multiline_authorization(self):
+        for header in ("Authorization:\n Basic\n multiline-secret", "Authorization: Digest username=secret-user, response=secret-response\r\n continuation-secret",
+                       "Authorization:\r\n Bearer\r\n multiline-secret"):
+            with self.subTest(header=header):
+                body = json.dumps({"error": "INVALID_REQUEST", "detail": {"field": "addons", "message": header,
+                                  "fixture-secret": "HTTPS://asset.example/?sig=private"}}).encode("utf-8")
+                details = runtime._http_error_details(io.BytesIO(body))
+                self.assertIn("addons", details["provider_message"])
+                for secret in ("multiline-secret", "secret-user", "secret-response", "continuation-secret", "fixture-secret", "sig=private"):
+                    self.assertNotIn(secret, repr(details))
 
     def test_raw_provider_data_redacts_both_keys(self):
         data = self.submission()

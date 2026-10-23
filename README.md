@@ -101,7 +101,12 @@ dcc-mcp-cli lint skill/hyper3d --warnings-as-errors --no-update-maintenance
 ```
 
 Tests use offline fixtures and do not spend account credits. CI checks Python
-3.7 and 3.12 on Windows and Linux. Real provider generation, signed download
-behavior and native DCC imports require separate live acceptance with an API
-key and the chosen host. Agentic is a provider beta. Multipart array encoding
-is documented as an integration assumption in the API reference.
+3.7 and 3.12 on Windows and Linux. The [2026-10-23 live acceptance](docs/live-acceptance-2026-10-23.md)
+covered all four paid submission routes, five downloads, and native imports in
+Maya 2027.2 and Blender 5.2.0, at a total experiment cost of 2.5 credits.
+See that report for per-format material and unit limits. Agentic remains a
+provider beta.
+
+From a source checkout, [the acceptance harness](skill/hyper3d/references/WORKFLOWS.md#local-acceptance-harness)
+reads one explicit action from JSON stdin and records private state separately
+from a sanitized report. It never retries a paid submission automatically.

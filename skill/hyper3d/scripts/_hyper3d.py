@@ -86,6 +86,40 @@ class _NoRedirect(request.HTTPRedirectHandler):
         return None
 
 
+def _safe_diagnostic(value):
+    if isinstance(value, str):
+        value = _clean(value)
+        value = re.sub(r"https?://[^\s\"<>]+", "[REDACTED_URL]", value, flags=re.IGNORECASE)
+        value = re.sub(r"\bbearer\s+[^\s,;\"}]+", "[REDACTED]", value, flags=re.IGNORECASE)
+        return re.sub(r"\bauthorization\s*[:=]\s*(?:(?:bearer|basic)\s+)?[^\r\n]*(?:\r?\n[ \t]+[^\r\n]*)*", "[REDACTED]", value, flags=re.IGNORECASE)
+    if isinstance(value, list):
+        return [_safe_diagnostic(item) for item in value]
+    if isinstance(value, dict):
+        return {_safe_diagnostic(key): _safe_diagnostic(item) for key, item in value.items()}
+    return value
+
+
+def _http_error_details(response):
+    try:
+        raw = response.read(MAX_RESPONSE + 1)
+        if len(raw) > MAX_RESPONSE:
+            return {}
+        data = _clean(json_loads(raw.decode("utf-8")))
+        if not isinstance(data, dict):
+            return {}
+        result = {}
+        code = data.get("code") or data.get("error")
+        if isinstance(code, str) and re.fullmatch(r"[A-Za-z][A-Za-z0-9_.-]{0,79}", code):
+            result["provider_code"] = code
+        fields = {field: data[field] for field in ("message", "detail", "errors", "error") if field in data}
+        if fields:
+            message = json_dumps(_safe_diagnostic(fields))
+            result["provider_message"] = message[:512]
+        return result
+    except Exception:
+        return {}
+
+
 def _api(endpoint, payload=None, multipart=None, usage_page=None):
     key = _key()
     headers = {"Authorization": "Bearer " + key, "Accept": "application/json"}
@@ -114,7 +148,7 @@ def _api(endpoint, payload=None, multipart=None, usage_page=None):
                 raise Hyper3DError("Hyper3D returned invalid JSON", "invalid_response")
     except error.HTTPError as exc:
         retry_after = exc.headers.get("Retry-After")
-        details = {"http_status": exc.code}
+        details = dict(_http_error_details(exc), http_status=exc.code)
         if retry_after and re.fullmatch(r"[A-Za-z0-9 ,:+-]{1,80}", retry_after):
             details["retry_after"] = retry_after
         raise Hyper3DError("Hyper3D rejected the request; do not automatically resubmit a generation", "provider_http_error", **details)
@@ -210,6 +244,8 @@ def _multipart(parameters, uploads):
     parts = []
     total = 0
     for field, value in parameters.items():
+        if isinstance(value, list) and not value:
+            continue
         encoded = value if isinstance(value, str) else json_dumps(value)
         parts.append(("--" + boundary + '\r\nContent-Disposition: form-data; name="' + field + '"\r\n\r\n' + encoded + "\r\n").encode("utf-8"))
     for field, path in uploads:
