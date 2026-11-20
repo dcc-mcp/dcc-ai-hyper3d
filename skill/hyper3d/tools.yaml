@@ -225,6 +225,11 @@ tools:
             - usdz
             - fbx
             - stl
+          route:
+            type: string
+            enum:
+            - high-poly
+            - n-gons
         description: Exact provider field names. Cross-field and model-family rules are validated at runtime;
           see references/API.md.
       image_paths:
@@ -259,6 +264,113 @@ tools:
         export_type: glb
       image_paths:
       - C:/references/front.png
+  next-tools:
+    on-success:
+    - get_task_status
+    on-failure:
+    - get_balance
+- name: create_polygen_task
+  description: Submit paid Low-poly generation from a Rodin asset, uploaded model, images, or text.
+  source_file: scripts/create_polygen_task.py
+  execution: sync
+  job_strategy: monolithic
+  affinity: any
+  enforce_thread_affinity: true
+  timeout_hint_secs: 130
+  annotations:
+    read_only_hint: false
+    destructive_hint: true
+    idempotent_hint: false
+    open_world_hint: true
+  group: hyper3d
+  input_schema:
+    type: object
+    additionalProperties: false
+    properties:
+      parameters:
+        type: object
+        additionalProperties: false
+        properties:
+          asset_id:
+            type: string
+            description: Completed Rodin task UUID; mutually exclusive with model_path.
+          prompt:
+            type: string
+            maxLength: 1024
+          transfer_texture:
+            type: boolean
+            description: Transfers uploaded model textures when model_path is supplied; defaults to true.
+          image_label:
+            type: array
+            maxItems: 5
+            items:
+              type: string
+              enum:
+              - F
+              - FL
+              - FR
+              - L
+              - R
+              - B
+              - BL
+              - BR
+              - U
+              - D
+              - '?'
+          face_count:
+            type: integer
+            minimum: 200
+            maximum: 10000
+          mesh_mode:
+            type: string
+            enum:
+            - Quad
+            - Raw
+            - NGon
+          geometry_file_format: *id002
+          material: *id003
+          resolution:
+            type: string
+            enum:
+            - Basic
+            - High
+          texture_mode: *id004
+          uhd_texture: *id001
+        description: Exact provider field names. Cross-field and input-mode rules are validated at runtime;
+          see references/API.md.
+      model_path:
+        type: string
+        description: Absolute OBJ/GLB/STL/FBX/USD/USDA/USDZ/USDC mesh path.
+      image_paths:
+        type: array
+        minItems: 0
+        maxItems: 5
+        items:
+          type: string
+          minLength: 1
+        description: Absolute PNG/JPEG/WebP paths on the adapter machine; uploaded inline in order.
+  output_schema:
+    type: object
+    required:
+    - success
+    - message
+    properties:
+      success:
+        type: boolean
+      message:
+        type: string
+      error:
+        type: string
+      context:
+        type: object
+        description: Provider payload, durable task identity, recovery context, or local file descriptors.
+  call_examples:
+  - arguments:
+      parameters:
+        asset_id: completed-rodin-task-uuid
+        face_count: 4000
+        mesh_mode: Quad
+        geometry_file_format: glb
   next-tools:
     on-success:
     - get_task_status
@@ -366,7 +478,7 @@ tools:
     on-failure:
     - get_balance
 - name: create_texture_task
-  description: Submit paid texture generation with one local mesh and exactly one reference image.
+  description: Submit paid texture generation with one local mesh and one to five reference images.
   source_file: scripts/create_texture_task.py
   execution: sync
   job_strategy: monolithic
@@ -398,8 +510,26 @@ tools:
             minimum: 0.5
             maximum: 1
           hd_texture: *id001
+          uhd_texture: *id001
           texture_delight: *id001
           texture_mode: *id004
+          image_label:
+            type: array
+            maxItems: 5
+            items:
+              type: string
+              enum:
+              - F
+              - FL
+              - FR
+              - L
+              - R
+              - B
+              - BL
+              - BR
+              - U
+              - D
+              - '?'
           seed:
             type: integer
             minimum: 0
@@ -425,11 +555,11 @@ tools:
       image_paths:
         type: array
         minItems: 1
-        maxItems: 1
+        maxItems: 5
         items:
           type: string
           minLength: 1
-        description: Absolute image paths on the adapter machine; uploaded inline in order.
+        description: Absolute image paths on the adapter machine; one to five PNG/JPEG/WebP or documented image files, each under 100 MiB.
     required:
     - model_path
     - image_paths
@@ -456,6 +586,7 @@ tools:
       model_path: C:/assets/mesh.glb
       image_paths:
       - C:/references/material.png
+      - C:/references/material-side.png
   next-tools:
     on-success:
     - get_task_status

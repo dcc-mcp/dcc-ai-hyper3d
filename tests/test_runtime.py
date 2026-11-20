@@ -34,6 +34,8 @@ class RuntimeTests(unittest.TestCase):
         self.root = Path(self.directory.name)
         self.image = self.root / "view.png"
         self.image.write_bytes(b"png-fixture")
+        self.image_side = self.root / "side.jpg"
+        self.image_side.write_bytes(b"jpg-fixture")
         self.model = self.root / "mesh.glb"
         self.model.write_bytes(b"glb-fixture")
 
@@ -52,9 +54,10 @@ class RuntimeTests(unittest.TestCase):
     def test_generation_endpoints_and_multipart_forwarding(self):
         cases = [
             (runtime.create_rodin_task, {"parameters": {"prompt": "a chair", "bbox_condition": [1, 2, 3], "addons": ["HighPack"], "image_label": ["F"], "soft": True, "future_provider_option": {"enabled": True}}, "image_paths": [str(self.image)]}, "rodin", b'name="images"', False),
-            (runtime.create_agentic_task, {"parameters": {"tier": "basic", "export_type": "glb"}, "image_paths": [str(self.image)]}, "rodin_agentic", b'name="images"', True),
+            (runtime.create_agentic_task, {"parameters": {"tier": "basic", "export_type": "glb", "route": "n-gons"}, "image_paths": [str(self.image)]}, "rodin_agentic", b'name="images"', True),
+            (runtime.create_polygen_task, {"parameters": {"prompt": "a low poly chair", "face_count": 4000, "mesh_mode": "NGon", "image_label": ["F", "B"]}, "image_paths": [str(self.image), str(self.image_side)]}, "polygen", b'name="images"', False),
             (runtime.create_bang_task, {"parameters": {"material": "None"}, "model_path": str(self.model)}, "bang", b'name="model"', False),
-            (runtime.create_texture_task, {"parameters": {"reference_scale": 0.5}, "model_path": str(self.model), "image_paths": [str(self.image)]}, "rodin_texture_only", b'name="image"', False),
+            (runtime.create_texture_task, {"parameters": {"reference_scale": 0.5, "uhd_texture": True, "image_label": ["F", "R"]}, "model_path": str(self.model), "image_paths": [str(self.image), str(self.image_side)]}, "rodin_texture_only", b'name="images"', False),
         ]
         for operation, arguments, endpoint, field, singular in cases:
             with self.subTest(endpoint=endpoint):
@@ -77,6 +80,17 @@ class RuntimeTests(unittest.TestCase):
                     self.assertIn(b'name="image_label"\r\n\r\n["F"]\r\n', req.data)
                     self.assertIn(b'name="soft"\r\n\r\ntrue\r\n', req.data)
                     self.assertIn(b'name="future_provider_option"\r\n\r\n{"enabled":true}\r\n', req.data)
+                if endpoint == "rodin_agentic":
+                    self.assertIn(b'name="route"\r\n\r\nn-gons\r\n', req.data)
+                if endpoint == "polygen":
+                    self.assertIn(b'name="face_count"\r\n\r\n4000\r\n', req.data)
+                    self.assertIn(b'name="mesh_mode"\r\n\r\nNGon\r\n', req.data)
+                    self.assertEqual(req.data.count(b'name="images"'), 2)
+                if endpoint == "rodin_texture_only":
+                    self.assertIn(b'name="uhd_texture"\r\n\r\ntrue\r\n', req.data)
+                    self.assertIn(b'name="image_label"\r\n\r\n["F","R"]\r\n', req.data)
+                    self.assertEqual(req.data.count(b'name="images"'), 2)
+                    self.assertNotIn(b'name="image"\r\n', req.data)
 
     def test_addons_use_literal_form_text_for_all_rodin_generations(self):
         for tier in ("Sketch", "Gen-2", "Gen-2.5-Medium"):
@@ -145,11 +159,17 @@ class RuntimeTests(unittest.TestCase):
             (runtime.create_rodin_task, {"parameters": {"prompt": "x", "future": [float("nan")]}}),
             (runtime.create_agentic_task, {"parameters": {}, "image_paths": []}),
             (runtime.create_agentic_task, {"parameters": {"export_type": "obj"}, "image_paths": [str(self.image)]}),
+            (runtime.create_agentic_task, {"parameters": {"route": "automatic"}, "image_paths": [str(self.image)]}),
+            (runtime.create_polygen_task, {"parameters": {}}),
+            (runtime.create_polygen_task, {"parameters": {"asset_id": "task"}, "model_path": str(self.model)}),
+            (runtime.create_polygen_task, {"parameters": {"prompt": "x", "face_count": 199}}),
+            (runtime.create_polygen_task, {"parameters": {"prompt": "x", "image_label": ["F"]}}),
             (runtime.create_bang_task, {"parameters": {"asset_id": "task"}, "model_path": str(self.model)}),
             (runtime.create_bang_task, {"parameters": {"asset_id": "task", "prompt": "x"}}),
             (runtime.create_bang_task, {"parameters": {}, "model_path": str(self.model)}),
             (runtime.create_texture_task, {"parameters": {"reference_scale": 0.4}, "model_path": str(self.model), "image_paths": [str(self.image)]}),
             (runtime.create_texture_task, {"parameters": {}, "model_path": str(self.model)}),
+            (runtime.create_texture_task, {"parameters": {}, "model_path": str(self.model), "image_paths": [str(self.image)] * 6}),
             (runtime.get_balance, {"usage_page": 0}),
             (runtime.get_balance, {"usage_page": True}),
             (runtime.get_task_status, {"subscription_key": ""}),
@@ -172,6 +192,37 @@ class RuntimeTests(unittest.TestCase):
         with patch.object(runtime, "MAX_UPLOAD", 1):
             with self.assertRaises(runtime.Hyper3DError):
                 runtime._multipart({}, [("images", self.model)])
+
+    def test_texture_image_count_and_size_contract(self):
+        with patch.object(runtime, "_api", return_value=self.submission()):
+            runtime.create_texture_task({}, model_path=str(self.model), image_paths=[str(self.image), str(self.image_side)])
+        oversized = self.root / "oversized.png"
+        oversized.write_bytes(b"12345")
+        with patch.object(runtime, "TEXTURE_UPLOAD_LIMIT", 4), patch.object(runtime, "_api") as api:
+            with self.assertRaises(runtime.Hyper3DError):
+                runtime.create_texture_task({}, model_path=str(self.model), image_paths=[str(oversized)])
+            api.assert_not_called()
+
+    def test_polygen_accepts_asset_and_model_contracts(self):
+        with patch.object(runtime, "_api", return_value=self.submission()) as api:
+            runtime.create_polygen_task({"asset_id": "source-task", "mesh_mode": "Quad"})
+            runtime.create_polygen_task({"transfer_texture": False}, model_path=str(self.model))
+        self.assertEqual(api.call_count, 2)
+        asset_body = api.call_args_list[0][1]["multipart"][0]
+        model_body = api.call_args_list[1][1]["multipart"][0]
+        self.assertIn(b'name="asset_id"\r\n\r\nsource-task\r\n', asset_body)
+        self.assertNotIn(b'name="model"', asset_body)
+        self.assertIn(b'name="transfer_texture"\r\n\r\nfalse\r\n', model_body)
+        self.assertIn(b'name="model"', model_body)
+
+    def test_polygen_network_failure_is_unknown_submission(self):
+        opener = Mock()
+        opener.open.side_effect = error.URLError("fixture-api-secret")
+        with patch.object(runtime.request, "build_opener", return_value=opener):
+            result = runtime.tool_call(runtime.create_polygen_task, parameters={"prompt": "a chair"})
+        self.assertFalse(result["success"])
+        self.assertTrue(result["context"]["submission_may_have_succeeded"])
+        self.assertEqual(opener.open.call_count, 1)
 
     def test_growing_upload_is_bounded_and_rejected(self):
         class GrowingStream(io.BytesIO):

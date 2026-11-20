@@ -105,7 +105,8 @@ class AcceptanceTests(unittest.TestCase):
 
     def test_submit_routes_each_explicit_kind_to_runtime(self):
         for kind, name in (("rodin", "create_rodin_task"), ("agentic", "create_agentic_task"),
-                           ("bang", "create_bang_task"), ("texture", "create_texture_task")):
+                           ("bang", "create_bang_task"), ("texture", "create_texture_task"),
+                           ("polygen", "create_polygen_task")):
             with self.subTest(kind=kind):
                 method = Mock(return_value={"task_uuid": "task-fixture", "subscription_key": "subscription-secret"})
                 setattr(self.runtime, name, method)
