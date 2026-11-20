@@ -38,7 +38,7 @@ class BundleContracts(unittest.TestCase):
             )
             self.assertEqual({skill["name"] for skill in server.list_skills()}, {"hyper3d"})
             names = server.load_skill("hyper3d")
-            self.assertEqual(len(names), 8)
+            self.assertEqual(len(names), 9)
             self.assertIn("hyper3d__get_balance", names)
             self.assertTrue(all(server.has_handler(name) for name in names))
             handle = server.start()
@@ -67,7 +67,7 @@ class BundleContracts(unittest.TestCase):
 
     def test_manifest_schemas_examples_and_scripts(self):
         manifest = yaml.safe_load((SKILL / "tools.yaml").read_text(encoding="utf-8"))
-        self.assertEqual(len(manifest["tools"]), 8)
+        self.assertEqual(len(manifest["tools"]), 9)
         names = set()
         for tool in manifest["tools"]:
             self.assertNotIn(tool["name"], names)

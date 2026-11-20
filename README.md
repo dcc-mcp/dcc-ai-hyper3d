@@ -9,21 +9,28 @@ texture generation, task queries and local asset delivery to any adapter.
 | Tool | Operation |
 | --- | --- |
 | `create_rodin_task` | Text/image/multiview generation, Gen 1/1.5, Gen 2 and Gen 2.5, all documented options |
-| `create_agentic_task` | Image-driven Agentic Beta, basic/standard/pro |
+| `create_agentic_task` | Image-driven Agentic Beta, basic/standard/pro, automatic or explicit route |
+| `create_polygen_task` | Low-poly generation from Rodin assets, models, images or text |
 | `create_bang_task` | Split/process an existing Rodin asset or uploaded model, with topology controls |
-| `create_texture_task` | Generate textures from an uploaded model and reference image |
+| `create_texture_task` | Generate textures from an uploaded model and one to five reference images |
 | `get_task_status` | Query every sub-job using the returned subscription key |
 | `get_download_links` | Obtain fresh temporary result URLs |
 | `get_balance` | Read account balance and paginated usage history |
 | `download_assets` | Check completion, save selected/all outputs, return hashes and asset descriptors |
 
-This implements the seven documented public API endpoints and exposes their
-documented request options. Files upload inline with the submission. The public
-reference documents no separate cancellation, task-list, delete, rigging,
-animation or standalone remesh endpoint; website and native-plugin feature
-parity is outside this scope. See the full
-[API reference and constraints](skill/hyper3d/references/API.md), verified
-against [Hyper3D documentation](https://docs.hyper3d.ai/en) on 2026-10-24.
+This implements the eight public API endpoints listed in the
+[API reference](skill/hyper3d/references/API.md), with request coverage verified
+on 2026-11-19. Files upload inline with the submission. Newer public endpoints
+such as Rigging and Generate Images remain outside this bundle.
+
+**Clean Topology:** the website now offers `Fast` / `Legacy` versions. A
+2026-11-06 check found no corresponding public operation with the same name.
+The official Low-poly API is available through `create_polygen_task`, while
+the website operation remains a separate feature until its public contract is
+confirmed. The skill includes
+[routing guidance and current limits](skill/hyper3d/references/API.md#clean-topology-website)
+for these requests.
+Website and native-plugin feature parity requires separate acceptance.
 
 ## Install
 

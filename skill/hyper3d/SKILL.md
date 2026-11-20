@@ -2,17 +2,18 @@
 name: hyper3d
 description: >-
   Generate 3D assets with Hyper3D Rodin Gen 1/1.5, Gen 2, Gen 2.5 or Agentic;
-  change topology with Bang, generate textures on existing meshes, inspect
-  task status and balance, and download assets for any DCC-MCP adapter.
+  create Low-poly assets with PolyGen, change topology with Bang, identify
+  website Clean Topology requests, generate textures on existing meshes,
+  inspect task status and balance, and download assets for any DCC-MCP adapter.
 license: MIT
 compatibility: "Python 3.7+, dcc-mcp-core 0.20.44+; Hyper3D API credential and network access"
 metadata:
   dcc-mcp:
-    version: "0.1.2"
+    version: "0.1.4"
     dcc: python
     layer: domain
     tags: [pipeline, ai, hyper3d, rodin, 3d-generation, text-to-3d, image-to-3d, cross-dcc]
-    search-hint: "Hyper3D Rodin Gen 2.5 Gen2 Agentic Bang text image multiview 3D mesh PBR texture remesh quad download balance"
+    search-hint: "Hyper3D Rodin Gen 2.5 Gen2 Agentic PolyGen Low-poly Bang Clean Topology Fast Legacy retopology text image multiview 3D mesh PBR texture remesh quad ngon download balance"
     tools: tools.yaml
     runtimes: runtimes.yaml
     skill-reference-docs:
@@ -32,8 +33,15 @@ commit them. Calls use the fixed `https://api.hyper3d.com/api/v2` endpoint.
 1. Read `get_balance` when checking credential readiness or budget.
 2. Choose `create_rodin_task` for text/image/multiview generation;
    `create_agentic_task` for the Agentic Beta;
+   `create_polygen_task` for Low-poly generation from a Rodin asset, uploaded
+   mesh, reference images or text;
    `create_bang_task` for topology/material processing of an existing Rodin asset
-   or uploaded mesh; `create_texture_task` for textures on an uploaded mesh.
+   or uploaded mesh; `create_texture_task` for textures on an uploaded mesh with
+   one to five reference images.
+   For **Clean Topology** (`Fast` / `Legacy`) requests, read the
+   [website workflow](references/WORKFLOWS.md#clean-topology-website): no public
+   API contract for that named operation was found as of 2026-11-06. Do not
+   substitute Bang, PolyGen or Quad mode.
 3. Supply provider options in `parameters` using the exact documented names.
    Supply local files using `image_paths` / `model_path`; files are uploaded
    inline as multipart parts. See [API coverage](references/API.md).
@@ -58,11 +66,12 @@ downloaded texture images therefore require material assignment. See
 Generation/processing consumes account credits. A submission timeout can mean
 the provider accepted the request: do not automatically submit it again. The
 API exposes no documented cancel, task-list, deletion, account-key creation,
-standalone upload or separate remesh endpoint. Topology options belong to Rodin
-and Bang. `TAPose` requests rest-pose conditioning; the public reference
-documents no skeleton, automatic-rigging or animation endpoint. Use native
-host tools for rigging and clips. `get_download_links` returns temporary signed
-URLs; keep them private.
+standalone upload or website Clean Topology endpoint. This bundle exposes the
+documented Rodin, PolyGen and Bang topology options. `TAPose` requests rest-pose
+conditioning, not a skeleton or animation. The provider also documents separate
+Rigging and Generate Images APIs; this bundle does not implement them. Use
+native host tools for rigging and clips in the current workflow.
+`get_download_links` returns temporary signed URLs; keep them private.
 
 Errors retain recovery context. If a multi-file download partially succeeds,
 keep its verified files and retry only missing names with `filenames`, or use a

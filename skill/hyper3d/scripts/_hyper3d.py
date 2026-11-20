@@ -27,13 +27,18 @@ MAX_UPLOAD = 512 * 1024 * 1024
 MAX_ASSET = 512 * 1024 * 1024
 MAX_TOTAL = 2 * 1024 * 1024 * 1024
 IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp", ".tif", ".tiff", ".gif", ".avif", ".heic", ".heif", ".bmp", ".jp2", ".j2k"}
+REFERENCE_IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp"}
 MODEL_EXTENSIONS = {".obj", ".stl", ".gltf", ".glb", ".fbx", ".usdz"}
+POLYGEN_MODEL_EXTENSIONS = {".obj", ".glb", ".stl", ".fbx", ".usd", ".usda", ".usdz", ".usdc"}
 FORMATS = {"glb", "usdz", "fbx", "obj", "stl"}
 MATERIALS = {"PBR", "Shaded", "All", "Hybrid", "None"}
-PROVIDER_ERRORS = {"INVALID_REQUEST", "API_NO_ACTIVE_SUBSCRIPTION", "API_SUBSCRIPTION_PLAN_TOO_LOW", "API_PARALLELISM_LIMIT_REACHED", "API_INSUFFICIENT_FUNDS", "API_OBJECT_NOT_FOUND_ON_IMAGE", "IMAGE_CONTENT_VIOLATION", "IMAGE_LABEL_LENGTH_TOO_LONG", "NO_SUCH_TASK", "ASSET_NOT_AVAILABLE", "PERMISSION_DENIED", "API_UNKNOWN"}
+PROVIDER_ERRORS = {"INVALID_REQUEST", "API_NO_ACTIVE_SUBSCRIPTION", "API_SUBSCRIPTION_PLAN_TOO_LOW", "API_PARALLELISM_LIMIT_REACHED", "API_INSUFFICIENT_FUNDS", "API_OBJECT_NOT_FOUND_ON_IMAGE", "IMAGE_CONTENT_VIOLATION", "IMAGE_LABEL_LENGTH_TOO_LONG", "NO_SUCH_TASK", "ASSET_NOT_AVAILABLE", "PERMISSION_DENIED", "API_UNKNOWN", "NO_ACTIVE_SUBSCRIPTION", "INSUFFICIENT_FUNDS", "UNKNOWN"}
 TIERS = {"Sketch", "Regular", "Detail", "Smooth", "Gen-2"} | {
     "Gen-2.5-" + quality for quality in ("Extreme-Low", "Low", "Medium", "High", "Extreme-High")
 }
+IMAGE_LABELS = {"F", "FL", "FR", "L", "R", "B", "BL", "BR", "U", "D", "?"}
+POLYGEN_MESH_MODES = {"Raw", "Quad", "NGon"}
+TEXTURE_UPLOAD_LIMIT = 100 * 1024 * 1024
 
 
 class Hyper3DError(Exception):
@@ -153,7 +158,7 @@ def _api(endpoint, payload=None, multipart=None, usage_page=None):
             details["retry_after"] = retry_after
         raise Hyper3DError("Hyper3D rejected the request; do not automatically resubmit a generation", "provider_http_error", **details)
     except (error.URLError, TimeoutError, OSError):
-        raise Hyper3DError("Hyper3D request outcome is unknown; do not automatically resubmit a generation", "network_error", submission_may_have_succeeded=endpoint in {"rodin", "rodin_agentic", "bang", "rodin_texture_only"})
+        raise Hyper3DError("Hyper3D request outcome is unknown; do not automatically resubmit a generation", "network_error", submission_may_have_succeeded=endpoint in {"rodin", "rodin_agentic", "bang", "rodin_texture_only", "polygen"})
     if not isinstance(data, dict):
         raise Hyper3DError("Hyper3D returned an unexpected response shape", "invalid_response")
     if data.get("error"):
@@ -203,19 +208,19 @@ def _number(parameters, field, minimum, maximum, integer=False):
         raise Hyper3DError(field + " is outside the documented range")
 
 
-def _common(parameters):
+def _common(parameters, mesh_modes=None):
     for field in ("prompt", "instruction", "asset_id"):
         if field in parameters and not isinstance(parameters[field], str):
             raise Hyper3DError(field + " must be text")
     _number(parameters, "seed", 0, 65535, True)
     _number(parameters, "escore", 0, 10)
-    _enum(parameters, "mesh_mode", {"Raw", "Quad"})
+    _enum(parameters, "mesh_mode", mesh_modes or {"Raw", "Quad"})
     _enum(parameters, "geometry_file_format", FORMATS)
     _enum(parameters, "material", MATERIALS)
     _enum(parameters, "quality", {"high", "medium", "low", "extra-low"})
     _enum(parameters, "texture_mode", {"legacy", "extreme-low", "low", "medium", "high", "extreme-high"})
     _enum(parameters, "resolution", {"Basic", "High"})
-    for field in ("soft", "quad_normal", "TAPose", "use_original_alpha", "preview_render", "hd_texture", "uhd_texture", "is_micro", "texture_delight", "mesh_simplify", "mesh_smooth"):
+    for field in ("soft", "quad_normal", "TAPose", "use_original_alpha", "preview_render", "hd_texture", "uhd_texture", "is_micro", "texture_delight", "mesh_simplify", "mesh_smooth", "transfer_texture"):
         if field in parameters and not isinstance(parameters[field], bool):
             raise Hyper3DError(field + " must be boolean")
 
@@ -231,12 +236,20 @@ def _file(path, extensions, limit=MAX_UPLOAD):
     return item
 
 
-def _images(image_paths, maximum=5, limit=MAX_UPLOAD):
+def _images(image_paths, maximum=5, limit=MAX_UPLOAD, extensions=None):
     if image_paths is None:
         return []
     if not isinstance(image_paths, list) or len(image_paths) > maximum:
         raise Hyper3DError("image_paths exceeds the documented image count")
-    return [_file(path, IMAGE_EXTENSIONS, limit) for path in image_paths]
+    return [_file(path, extensions or IMAGE_EXTENSIONS, limit) for path in image_paths]
+
+
+def _validate_image_labels(parameters, images):
+    if "image_label" not in parameters:
+        return
+    values = parameters["image_label"]
+    if not isinstance(values, list) or len(values) > len(images) or any(value not in IMAGE_LABELS for value in values):
+        raise Hyper3DError("image_label must contain supported labels for uploaded images")
 
 
 def _multipart(parameters, uploads):
@@ -318,10 +331,7 @@ def create_rodin_task(parameters, image_paths=None):
             raise Hyper3DError("bbox_condition requires three integers from 1 to 2048")
     if "addons" in parameters and (not isinstance(parameters["addons"], list) or any(v != "HighPack" for v in parameters["addons"])):
         raise Hyper3DError("addons supports only HighPack")
-    if "image_label" in parameters:
-        values = parameters["image_label"]
-        if not isinstance(values, list) or len(values) > len(images) or any(v not in {"F", "FL", "FR", "L", "R", "B", "BL", "BR", "U", "D", "?"} for v in values):
-            raise Hyper3DError("image_label must contain supported labels for uploaded images")
+    _validate_image_labels(parameters, images)
     return _submit("rodin", parameters, [("images", image) for image in images])
 
 
@@ -332,6 +342,7 @@ def create_agentic_task(parameters, image_paths=None):
         raise Hyper3DError("prompt must contain at most 1024 characters")
     _enum(parameters, "tier", {"basic", "standard", "pro"})
     _enum(parameters, "export_type", {"glb", "usdz", "fbx", "stl"})
+    _enum(parameters, "route", {"high-poly", "n-gons"})
     images = _images(image_paths, limit=25 * 1024 * 1024)
     if not images:
         raise Hyper3DError("Agentic requires one to five images")
@@ -365,11 +376,33 @@ def create_texture_task(parameters, model_path, image_paths=None):
     _common(parameters)
     _number(parameters, "reference_scale", 0.5, 1)
     _enum(parameters, "material", MATERIALS - {"None"})
-    images = _images(image_paths, maximum=1)
+    images = _images(image_paths, maximum=5, limit=TEXTURE_UPLOAD_LIMIT)
     if not images:
-        raise Hyper3DError("Texture generation requires exactly one image")
-    model = _file(model_path, MODEL_EXTENSIONS)
-    return _submit("rodin_texture_only", parameters, [("model", model), ("image", images[0])])
+        raise Hyper3DError("Texture generation requires one to five images")
+    _validate_image_labels(parameters, images)
+    model = _file(model_path, MODEL_EXTENSIONS, TEXTURE_UPLOAD_LIMIT)
+    return _submit("rodin_texture_only", parameters, [("model", model)] + [("images", image) for image in images])
+
+
+def create_polygen_task(parameters, model_path=None, image_paths=None):
+    parameters = _parameters(parameters)
+    _common(parameters, mesh_modes=POLYGEN_MESH_MODES)
+    _number(parameters, "face_count", 200, 10000, True)
+    if len(parameters.get("prompt", "")) > 1024:
+        raise Hyper3DError("prompt must contain at most 1024 characters")
+    images = _images(image_paths, extensions=REFERENCE_IMAGE_EXTENSIONS)
+    _validate_image_labels(parameters, images)
+    asset_id = parameters.get("asset_id", "").strip()
+    if bool(asset_id) and model_path:
+        raise Hyper3DError("PolyGen accepts either asset_id or model_path, not both")
+    if not asset_id and not model_path and not images and not parameters.get("prompt", "").strip():
+        raise Hyper3DError("PolyGen requires an asset_id, model_path, images, or a prompt")
+    if model_path:
+        model = _file(model_path, POLYGEN_MODEL_EXTENSIONS)
+        uploads = [("model", model)] + [("images", image) for image in images]
+    else:
+        uploads = [("images", image) for image in images]
+    return _submit("polygen", parameters, uploads)
 
 
 def _identifier(value, field):

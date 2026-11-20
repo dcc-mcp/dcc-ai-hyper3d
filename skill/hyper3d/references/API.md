@@ -1,6 +1,6 @@
 # Hyper3D public API contract
 
-Verified against the current English official documentation on 2026-10-24. This is a compact integration reference; the linked upstream schemas remain authoritative. Public API coverage means implementation of the seven endpoints below and exposure of their documented request fields, including all Rodin model families. It does not establish website or native-plugin feature parity. The public reference does not document separate upload, cancel, task-list, delete, remesh, mesh-edit, rigging, animation, model-search, or asset-library endpoints. Uploads accompany multipart submissions; topology and target-face controls belong to generation or Bang. `TAPose` requests rest-pose conditioning, not a skeleton or animation.
+Request coverage for the eight implemented provider endpoints below was verified against the English official documentation on 2026-11-19. Clean Topology availability was rechecked on 2026-11-06; see its dated section below. This is a compact integration reference; the linked upstream schemas remain authoritative. It does not establish website or native-plugin feature parity. Uploads accompany multipart submissions; this bundle's topology and target-face controls belong to Rodin, PolyGen or Bang. `TAPose` requests rest-pose conditioning, not a skeleton or animation. The provider also documents [Rigging](https://docs.hyper3d.ai/en/api-specification/rigging) and [Generate Images](https://docs.hyper3d.ai/en/api-specification/images); these endpoints are not implemented here.
 
 ## Transport and lifecycle
 
@@ -10,6 +10,7 @@ Base URL: `https://api.hyper3d.com/api/v2`. Authenticate API calls with `Authori
 | --- | --- | --- | --- |
 | POST | `/rodin` | multipart | Gen-1/1.5, Gen-2, Gen-2.5 generation |
 | POST | `/rodin_agentic` | multipart | Agent-selected generation; beta |
+| POST | `/polygen` | multipart | Low-poly generation from an asset, model, images or text |
 | POST | `/rodin_texture_only` | multipart | Texture an uploaded model |
 | POST | `/bang` | multipart | Split a generated asset or uploaded model |
 | POST | `/status` | JSON | Inspect every sub-job |
@@ -72,25 +73,54 @@ Explicit creative mode requires Medium or above; faithful is experimental. Micro
 
 ## Rodin Agentic
 
-`POST /rodin_agentic`: required `images`, one to five, each ≤25 MiB; optional `prompt` ≤1024 characters; `tier=basic|standard|pro` (default standard); `export_type=glb|usdz|fbx|stl` (default glb). Blank prompt derives guidance from images. There is no OBJ export option here.
+`POST /rodin_agentic`: required `images`, one to five, each ≤25 MiB; optional `prompt` ≤1024 characters; `tier=basic|standard|pro` (default standard); `export_type=glb|usdz|fbx|stl` (default glb); optional `route=high-poly|n-gons`. Blank prompt derives guidance from images. There is no OBJ export option here.
 
-Response: `uuid`, `producer=high-poly|n-gons`, `job:{uuids,subscription_key}`. Poll with `job.subscription_key`, download with `uuid`. Agentic is beta and selects the generation route automatically. [Rodin Agentic](https://docs.hyper3d.ai/en/api-specification/rodin-agentic)
+Response: `uuid`, `producer=high-poly|n-gons`, `job:{uuids,subscription_key}`. Poll with `job.subscription_key`, download with `uuid`. Agentic is beta and selects the generation route automatically when `route` is omitted. [Rodin Agentic](https://docs.hyper3d.ai/en/api-specification/rodin-agentic)
+
+## PolyGen Low-poly
+
+`POST /polygen` creates a low-poly task from exactly one of `asset_id` or
+`model`, from one to five `images`, or from a non-blank `prompt`. `asset_id` and
+`model` are mutually exclusive. Uploaded models support OBJ, GLB, STL, FBX,
+USD, USDA, USDZ and USDC. Reference images support PNG, JPEG and WebP.
+
+| Field | Values / limits |
+| --- | --- |
+| `transfer_texture` | boolean; applies to uploaded `model`, default true |
+| `image_label` | array matched to uploaded images, using the standard direction labels |
+| `face_count` | integer 200–10000 |
+| `mesh_mode` | `Quad`, `Raw`, `NGon`; default `Quad` |
+| `geometry_file_format` | `obj` (default), `glb`, `usdz`, `fbx`, `stl` |
+| `material` | `None` (default), `PBR`, `Shaded`, `Hybrid`, `All` |
+| `resolution` | `Basic` (default), `High` |
+| `texture_mode` | `legacy`, `extreme-low`, `low`, `medium`, `high`, `extreme-high` |
+| `uhd_texture` | boolean; sharpens generated texture detail |
+
+For an uploaded model, PolyGen transfers its original textures and ignores
+`prompt`, `material`, `texture_mode` and `uhd_texture`; `resolution` controls
+the transferred texture export. For an asset, images or text input,
+`material=None` produces geometry only. Each task costs 0.5 credits and uses
+the standard status and download lifecycle. [Low-poly](https://docs.hyper3d.ai/en/api-specification/polygen)
 
 ## Texture generation
 
-`POST /rodin_texture_only` requires exactly one `image` and one `model` file. Images: JPEG, PNG, WebP, TIFF, GIF, AVIF, HEIC, HEIF, BMP, JPEG 2000. Models: OBJ, STL, glTF/GLB, FBX, USDZ. No upload size limit is stated.
+`POST /rodin_texture_only` requires one `model` and one to five repeated
+`images` parts. Each image and the model must be smaller than 100 MiB. Images
+support JPEG, PNG, WebP, TIFF, GIF, AVIF, HEIC, HEIF, BMP and JPEG 2000. Models
+support OBJ, STL, glTF/GLB, FBX and USDZ.
 
 | Field | Values / limits |
 | --- | --- |
 | `prompt` | optional string |
 | `escore` | number 0–10; default 3.5 |
 | `reference_scale` | number 0.5–1; default 1 |
-| `hd_texture`, `texture_delight` | boolean; default false |
+| `hd_texture`, `uhd_texture`, `texture_delight` | boolean; default false |
 | `texture_mode` | `legacy`,`extreme-low`,`low`,`medium`,`high` (default),`extreme-high` |
 | `seed` | integer 0–65535 |
 | `geometry_file_format` | `glb` (default),`usdz`,`fbx`,`obj`,`stl` |
 | `material` | `PBR` (default),`Shaded`,`All`,`Hybrid` |
 | `resolution` | `Basic` (default),`High` |
+| `image_label` | array matched to the uploaded images, using the standard direction labels |
 
 Basic/High means 2K/4K normally, 6K/12K in extreme-high mode. The schema includes Hybrid despite prose omitting it. [Generate Texture](https://docs.hyper3d.ai/en/api-specification/generate-texture)
 
@@ -113,11 +143,32 @@ Basic/High means 2K/4K normally, 6K/12K in extreme-high mode. The schema include
 
 `instruction` enables directed splitting. Without an override, target faces are Quad 18000 / Raw 150000. Raw is simplified only above target. [Bang](https://docs.hyper3d.ai/en/api-specification/bang)
 
+## Clean Topology (website)
+
+On 2026-11-06, the [Rodin workspace](https://hyper3d.ai/workspace/rodin)'s
+[public frontend bundle](https://hyper3d.ai/static/js/main.4162abdf.js) labels a
+separate geometry operation **Clean Topology**, with `Fast` and `Legacy`
+versions. Availability depends on the asset and account. This is frontend
+evidence, not a supported public API contract or a completed generation test.
+
+The provider now publishes a separate [Low-poly API](https://docs.hyper3d.ai/en/api-specification/polygen)
+at `/api/v2/polygen`. Its documented contract does not name or version the
+website's Clean Topology operation. Do not infer that `PolyGen` selects the
+website `Fast` or `Legacy` mode.
+
+`mesh_mode=Quad` selects a documented face type in Rodin, Bang or PolyGen; it
+does not select Clean Topology or its version. Bang splits an asset and PolyGen
+creates a low-poly result, so neither operation is an equivalent cleanup
+operation. No Clean Topology tool, pricing, output contract or API acceptance
+is claimed by this bundle. Follow the [website workflow](WORKFLOWS.md#clean-topology-website)
+for an explicit website request. API integration requires a published provider
+contract.
+
 ## Balance and errors
 
 `GET /check_balance`: optional `usage_page>=1`; response `balance:number` and, when requested, up to 20 newest-first `usage:[{time,item,amount,task_uuid}]`. Balance is a point-in-time reading, not a reservation. [Check Balance](https://docs.hyper3d.ai/en/api-specification/check-balance)
 
-Submission error codes: `INVALID_REQUEST`, `API_NO_ACTIVE_SUBSCRIPTION`, `API_SUBSCRIPTION_PLAN_TOO_LOW`, `API_PARALLELISM_LIMIT_REACHED`, `API_INSUFFICIENT_FUNDS`, `API_OBJECT_NOT_FOUND_ON_IMAGE`, `IMAGE_CONTENT_VIOLATION`, `IMAGE_LABEL_LENGTH_TOO_LONG`, `NO_SUCH_TASK`, `ASSET_NOT_AVAILABLE`, `PERMISSION_DENIED`, `API_UNKNOWN`. Status can return `NO_SUCH_TASK`; download can return `NO_SUCH_TASK` or `INVALID_REQUEST`. Text-only prompts can fail image moderation because they first generate an image.
+Submission error codes include `INVALID_REQUEST`, `API_NO_ACTIVE_SUBSCRIPTION`, `API_SUBSCRIPTION_PLAN_TOO_LOW`, `API_PARALLELISM_LIMIT_REACHED`, `API_INSUFFICIENT_FUNDS`, `NO_ACTIVE_SUBSCRIPTION`, `INSUFFICIENT_FUNDS`, `API_OBJECT_NOT_FOUND_ON_IMAGE`, `IMAGE_CONTENT_VIOLATION`, `IMAGE_LABEL_LENGTH_TOO_LONG`, `NO_SUCH_TASK`, `ASSET_NOT_AVAILABLE`, `PERMISSION_DENIED`, `API_UNKNOWN` and the PolyGen-specific `UNKNOWN`. Status can return `NO_SUCH_TASK`; download can return `NO_SUCH_TASK` or `INVALID_REQUEST`. Text-only prompts can fail image moderation because they first generate an image.
 
 HTTP 400: malformed input; 401: authentication; 429: throttling. Body errors must not trigger automatic resubmission. Upstream recommends backoff for 429/5xx; paid submissions need duplicate-charge caution when the outcome is ambiguous. Limits vary by endpoint/account, so do not hardcode a global rate. [Errors](https://docs.hyper3d.ai/en/api-specification/errors)
 
@@ -129,7 +180,7 @@ still has an unknown submission outcome and must not trigger an automatic retry.
 
 ## Billing, retention, and documentation gaps
 
-Endpoint documentation currently lists Gen-1/1.5 and Gen-2 at 0.5 credits; Gen-2.5 at 0.5 plus 0.5 for Extreme-High and 2 for extreme-high textures; Agentic basic/standard/pro at 0.5/1/2; Bang at 0.5; texture generation at 0.5, or 2 for extreme-high. Current marketing still mentions a HighPack surcharge while generation pages say unlisted options add no charge. Do not promise estimates as final cost; expose returned `consumed` and check [current API pricing](https://hyper3d.ai/features/api) and [pricing plans](https://hyper3d.ai/pricing) before paid work.
+Endpoint documentation currently lists Gen-1/1.5 and Gen-2 at 0.5 credits; Gen-2.5 at 0.5 plus 0.5 for Extreme-High and 2 for extreme-high textures; Agentic basic/standard/pro at 0.5/1/2; PolyGen at 0.5; Bang at 0.5; texture generation at 0.5, or 2 for extreme-high. Current marketing still mentions a HighPack surcharge while generation pages say unlisted options add no charge. Do not promise estimates as final cost; expose returned `consumed` and check [current API pricing](https://hyper3d.ai/features/api) and [pricing plans](https://hyper3d.ai/pricing) before paid work.
 
 API inputs/outputs remain in active systems for seven days. Download promptly. The API policy says they are not used for training or published to public assets, subject to the stated operational/legal exceptions. [Data Retention Policy](https://docs.hyper3d.ai/en/legal/data-retention-policy)
 

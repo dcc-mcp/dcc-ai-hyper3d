@@ -65,12 +65,36 @@ Confirm the destination scene settings and intended asset size. See
 
 For Bang, choose an `asset_id` in `parameters` or supply `model_path` and
 the image/parameters required by the chosen material mode. The two input modes
-are mutually exclusive. Bang options such as `mesh_mode`, `quality` and
+are mutually exclusive. Bang options such as `mesh_mode` and
 `quality_override` control topology; this is a paid provider operation.
 
+For Low-poly, use `hyper3d__create_polygen_task`. Supply one of a completed
+Rodin `asset_id`, a local `model_path`, one to five reference images, or a text
+prompt. `face_count` controls the target from 200 to 10000 faces. `mesh_mode`
+can be `Quad`, `Raw` or `NGon`. PolyGen uses the same status, download and
+cross-DCC descriptor flow as other asynchronous generation tasks.
+
 For `hyper3d__create_texture_task`, supply the local mesh in `model_path`,
-and exactly one reference image in `image_paths`, plus the optional prompt.
-Consult [API constraints](API.md) before choosing format-specific options.
+and one to five reference images in `image_paths`, plus the optional prompt.
+Use `image_label` when the image viewing directions are known. Each texture
+image and the model must be smaller than 100 MiB. Consult [API constraints](API.md)
+before choosing format-specific options.
+
+## Clean Topology (website)
+
+Recognize **Clean Topology**, including `Fast` / `Legacy`, as a distinct
+website operation. See the [2026-11-06 availability check](API.md#clean-topology-website).
+For an API-only request, report the missing public contract before submitting
+any paid job. Do not silently use `mesh_mode=Quad`, Bang, or guessed parameters.
+
+When the user explicitly requests the website operation, use project-owned
+`dcc-cua` through DCC-MCP `ui-control`. Before any UI observation or input,
+report `provider=dcc-cua`, runtime version, target PID and HWND. If that route
+or binding is unavailable, report the blocker; do not use generic Computer Use
+or browser-control fallbacks. Select the requested asset and available Clean
+Topology version from fresh observations. Treat submission as paid work with
+no automatic retries, and verify the resulting mesh separately. Website
+downloads do not acquire the API's task or `AssetDescriptor` contract implicitly.
 
 ## Local acceptance harness
 

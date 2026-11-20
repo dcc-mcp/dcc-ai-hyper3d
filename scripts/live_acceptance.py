@@ -1,7 +1,7 @@
 """Run exactly one explicit API action from JSON stdin; never retry submissions.
 
 Input: {"operation": "balance|submit|status|download", "evidence_dir": "...",
-"arguments": {...}, "kind": "rodin|agentic|bang|texture", "state_file": "..."}.
+"arguments": {...}, "kind": "rodin|agentic|bang|texture|polygen", "state_file": "..."}.
 Only submit uses kind; status/download may recover identities from state_file.
 The private state contains job credentials. Keep its directory private and local.
 """
@@ -69,7 +69,8 @@ def run(payload, runtime=None):
     kind = payload.get("kind")
     methods = {"balance": "get_balance", "status": "get_task_status", "download": "download_assets"}
     submissions = {"rodin": "create_rodin_task", "agentic": "create_agentic_task",
-                   "bang": "create_bang_task", "texture": "create_texture_task"}
+                   "bang": "create_bang_task", "texture": "create_texture_task",
+                   "polygen": "create_polygen_task"}
     if operation not in set(methods) | {"submit"} or (operation == "submit" and kind not in submissions):
         raise ValueError("Choose a supported operation and explicit submit kind")
     arguments = payload.get("arguments", {})
